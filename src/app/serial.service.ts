@@ -2,6 +2,21 @@ import { Injectable } from '@angular/core';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const navigator: any;
 
+const options = {
+  baudRate: 4800,
+  dataBits: 8,
+  stopBits: 1,
+  parity: 'none',
+  flowControl: 'hardware',
+};
+const readFirmware = [0x0f, 0x00, 0x01, 0x00, 0x00, 0xf1];
+// const readFirmwareExt =
+// [
+//     0x0F, 0x00, 0x1C, 0x00, 0x0E, 0xE2, 0x00, 0x00,
+//     0x00, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//     0x00, 0x00, 0x00, 0x00, 0x6F,
+// ];
+
 @Injectable({
   providedIn: 'root',
 })
@@ -29,13 +44,13 @@ export class SerialService {
   }
 
   // Open the serial port
-  async openPort(baudRate = 9600): Promise<void> {
+  async openPort(): Promise<void> {
     if (!this.port) {
       console.error('No port selected.');
       return;
     }
     try {
-      await this.port.open({ baudRate });
+      await this.port.open(options);
       const info = this.port.getInfo();
       console.log(info);
       console.log('Port opened!');
@@ -55,6 +70,8 @@ export class SerialService {
     try {
       while (true) {
         const { value, done } = await reader.read();
+        console.log('read', value);
+
         if (done) break;
         console.log('Received data:', value);
       }
@@ -66,20 +83,23 @@ export class SerialService {
   }
 
   // Write data to the serial port
-  async writeData(data: { id: number; name: string }): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+  async writeData(): Promise<void> {
     if (!this.port || !this.port.writable) {
       console.error('No writable port available.');
       return;
     }
 
     const writer = this.port.writable.getWriter();
-    const stringify = JSON.stringify(data);
+    const stringify = JSON.stringify(readFirmware);
     const encoder = new TextEncoder();
     const encodedData = encoder.encode(stringify);
 
     try {
       await writer.write(encodedData);
-      console.log('Data sent:', data);
+      console.log(this.port);
+
+      console.log('Data sent:', encodedData);
     } catch (error) {
       console.error('Error writing data:', error);
     } finally {

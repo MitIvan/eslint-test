@@ -23,11 +23,7 @@ export class SerialPortComponent {
 
   // Write data to the serial port
   async writeData() {
-    const data = {
-      id: 1,
-      name: 'Ivan',
-    };
-    await this.serialService.writeData(data);
+    await this.serialService.writeData();
   }
 
   // Read data from the serial port
