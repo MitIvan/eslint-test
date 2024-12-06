@@ -1,7 +1,8 @@
 <div>
     <h1>Web Bluetooth Demo</h1>
     <button (click)="connectToDevice()">Connect to Bluetooth Device</button>
+    <button (click)="sendData()">Send Data</button>
     <button (click)="disconnectFromDevice()">Disconnect</button>
     <p>{{ statusMessage }} message</p>
-    <p [@if]="errorMessage" style="color: red;">{{ errorMessage }}</p>
+    <p style="color: red;">{{ errorMessage }}</p>
   </div>
