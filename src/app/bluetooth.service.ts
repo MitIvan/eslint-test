@@ -13,25 +13,50 @@ export class BluetoothService {
     try {
       // Request a Bluetooth device
       this.device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['immediate_alert'], // Add the required service UUIDs here
+        filters: [
+          { 
+            services : ['77370001-9156-09be-554f-63b16824d02b']
+          }
+        ]
+        // optionalServices: ['77370001-9156-09be-554f-63b16824d02b'], // Add the required service UUIDs here
       });
 
-      if (!this.device.gatt) {
-        throw new Error('GATT server is not available on the device.');
-      }
+      // if (!this.device.gatt) {
+      //   throw new Error('GATT server is not available on the device.');
+      // }
 
       const server = await this.device.gatt.connect();
-      const service = await server.getPrimaryService('immediate_alert');
-      const characteristic = await service.getCharacteristic('alert_level');
-      const value = await characteristic.readValue();
-      const batteryLevel = value.getUint8(0);
+      const service = await server.getPrimaryService('77370001-9156-09be-554f-63b16824d02b');
+      const characteristic = await service.getCharacteristic('77370003-9156-09be-554f-63b16824d02b');
+      // const value = await characteristic.readValue();
+      // const data = value.getUint8(0);
 
-      return `Battery Level: ${batteryLevel}%`;
+      await characteristic.startNotifications();
+
+      if (characteristic.properties.notify) {
+        characteristic.addEventListener(
+          "characteristicvaluechanged",
+          (event: Event) => {
+            const target = event.target as any
+            const value = target.value
+            this.handleNotification(value)
+          },
+        );
+       
+      }
+
+      return `Battery Level: %`;
     } catch (error) {
       console.log(error);
       ;
     }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handleNotification(value: any){
+    const getVlaue = value.getUint8(1)
+    console.log(getVlaue);
+    
   }
 
   async writeData(data: number): Promise<string | undefined | void> {
