@@ -67,8 +67,8 @@ export class BluetoothService {
 
       // Access the GATT server
       const server = await this.device.gatt.connect();
-      const service = await server.getPrimaryService('immediate_alert');
-      const characteristic = await service.getCharacteristic('alert_level');
+      const service = await server.getPrimaryService('77370001-9156-09be-554f-63b16824d02b');
+      const characteristic = await service.getCharacteristic('77370003-9156-09be-554f-63b16824d02b');
 
       // Write the data (e.g., alert level: 0x00, 0x01, or 0x02)
       const dataToSend = new Uint8Array([data]);
