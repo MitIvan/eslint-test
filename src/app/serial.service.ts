@@ -9,13 +9,6 @@ const options = {
   parity: 'none',
   flowControl: 'hardware',
 };
-const readFirmware = [0x0f, 0x00, 0x01, 0x00, 0x00, 0xf1];
-// const readFirmwareExt =
-// [
-//     0x0F, 0x00, 0x1C, 0x00, 0x0E, 0xE2, 0x00, 0x00,
-//     0x00, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-//     0x00, 0x00, 0x00, 0x00, 0x6F,
-// ];
 
 @Injectable({
   providedIn: 'root',
@@ -24,101 +17,109 @@ export class SerialService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private port: any | null = null;
 
-  // Request a serial port
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async requestPort(): Promise<any> {
+  // private port: SerialPort | null = null;
+  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+
+  async connect() {
     if (!('serial' in navigator)) {
-      alert('Web Serial API is not supported in this browser.');
-      return null;
-    }
-
-    try {
-      const port = await navigator.serial.requestPort();
-      this.port = port;
-      console.log('Selected port:', port);
-      return port;
-    } catch (error) {
-      console.error('Failed to request port:', error);
-      return null;
-    }
-  }
-
-  // Open the serial port
-  async openPort(): Promise<void> {
-    if (!this.port) {
-      console.error('No port selected.');
+      console.error('Web Serial API not supported.');
       return;
     }
+
     try {
+      this.port = await navigator.serial.requestPort();
       await this.port.open(options);
-      const info = this.port.getInfo();
-      console.log(info);
-      console.log('Port opened!');
+      this.reader = this.port.readable.getReader();
+      this.writer = this.port.writable.getWriter();
     } catch (error) {
-      console.error('Failed to open port:', error);
+      console.error('Failed to open serial port:', error);
     }
   }
 
-  // Read data from the serial port
-  async readData(): Promise<void> {
-    if (!this.port || !this.port.readable) {
-      console.error('No readable port available.');
-      return;
+  async disconnect() {
+    if (this.reader) {
+      await this.reader.cancel();
+      this.reader.releaseLock();
     }
-
-    const reader = this.port.readable.getReader();
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        console.log('read', value);
-
-        if (done) break;
-        console.log('Received data:', value);
-      }
-    } catch (error) {
-      console.error('Error reading data:', error);
-    } finally {
-      reader.releaseLock();
+    if (this.writer) {
+      await this.writer.close();
+      this.writer.releaseLock();
     }
-  }
-
-  // Write data to the serial port
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-  async writeData(): Promise<void> {
-    if (!this.port || !this.port.writable) {
-      console.error('No writable port available.');
-      return;
-    }
-
-    const writer = this.port.writable.getWriter();
-    const stringify = JSON.stringify(readFirmware);
-    const encoder = new TextEncoder();
-    const encodedData = encoder.encode(stringify);
-
-    try {
-      await writer.write(encodedData);
-      console.log(this.port);
-
-      console.log('Data sent:', encodedData);
-    } catch (error) {
-      console.error('Error writing data:', error);
-    } finally {
-      writer.releaseLock();
-    }
-  }
-
-  // Close the serial port
-  async closePort(): Promise<void> {
-    if (!this.port) {
-      console.error('No port to close.');
-      return;
-    }
-
-    try {
+    if (this.port) {
       await this.port.close();
-      console.log('Port closed!');
-    } catch (error) {
-      console.error('Error closing port:', error);
     }
+  }
+
+  async write(data: Uint8Array) {
+    if (!this.writer) {
+      throw new Error('Serial port not open');
+    }
+    console.log('Writing:', this.toHexString(data));
+    await this.writer.write(data);
+  }
+
+  async read(ack: boolean): Promise<Uint8Array> {
+    if (!this.reader) {
+      throw new Error('Serial port not open');
+    }
+
+    const bytes: number[] = [];
+    while (true) {
+      const { value, done } = await this.reader.read();
+      if (done || !value) break;
+
+      for (const bt of value) {
+        bytes.push(bt);
+
+        switch (bytes[0]) {
+          case 0x02:
+            continue;
+
+          case 0x17:
+          case 0x18:
+            throw new Error('Timeout');
+
+          case 0x06:
+            if (!ack) {
+              throw new Error('Unexpected answer');
+            }
+            return new Uint8Array([0x06, bytes[0]]);
+
+          case 0x0e:
+          case 0x0f: {
+            if (ack) {
+              throw new Error('Unexpected answer');
+            }
+            if (bytes.length < 5) continue;
+
+            const datalen = (bytes[3] << 8) + bytes[4] + 1;
+            if (bytes.length < datalen + 6) continue;
+
+            return new Uint8Array(bytes.slice(6, 6 + datalen));
+          }
+
+          default:
+            return new Uint8Array([bt]);
+        }
+      }
+    }
+
+    return new Uint8Array(bytes);
+  }
+
+  repack(data: Uint8Array) {
+    if (data[0] === 0x0e) return;
+
+    const chkSum = (bytes: Uint8Array, n: number) => {
+      return bytes.slice(0, n).reduce((a, b) => a ^ b, 0xff);
+    };
+
+    data[0] = 0x0e;
+    data[5] = chkSum(data, 5);
+  }
+
+  private toHexString(byteArray: Uint8Array): string {
+    return Array.from(byteArray, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 }
