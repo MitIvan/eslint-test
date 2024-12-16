@@ -24,7 +24,7 @@ export class BluetoothComponent {
 
   async sendData() {
     try {
-      await this.bluetoothService.writeData(0x01); // Example data
+      await this.bluetoothService.writeData(); // Example data
       this.statusMessage = 'Data sent successfully';
       this.errorMessage = null;
     } catch (error: any) {

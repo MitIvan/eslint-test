@@ -54,12 +54,14 @@ export class BluetoothService {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handleNotification(value: any){
-    const getVlaue = value.getUint8(1)
-    console.log(getVlaue);
+  const hex = Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  console.log('Received hex value:', hex);
+  
+    console.log(value);
     
   }
 
-  async writeData(data: number): Promise<string | undefined | void> {
+  async writeData(): Promise<string | undefined | void> {
     try {
       if (!this.device || !this.device.gatt.connected) {
         throw new Error('No connected device. Please connect to a device first.');
@@ -68,17 +70,25 @@ export class BluetoothService {
       // Access the GATT server
       const server = await this.device.gatt.connect();
       const service = await server.getPrimaryService('77370001-9156-09be-554f-63b16824d02b');
-      const characteristic = await service.getCharacteristic('77370003-9156-09be-554f-63b16824d02b');
+      const characteristic = await service.getCharacteristic('77370002-9156-09be-554f-63b16824d02b');
 
       // Write the data (e.g., alert level: 0x00, 0x01, or 0x02)
-      const dataToSend = new Uint8Array([data]);
+      const dataToSend = this.hexStringToUint8Array('0x100210000134120d0000000d0000007856321003');
       await characteristic.writeValue(dataToSend);
 
-      console.log(`Data written successfully: ${data}`);
-    } catch (error) {
+      console.log(`Data written successfully: ${dataToSend}`);
+    } catch (error) { 
       console.error('Write Error:', error);
     }
   }
+
+   hexStringToUint8Array(hexString:string) {
+    let bytes = new Uint8Array(hexString.length / 2);
+    for (let i = 0; i < hexString.length; i += 2) {
+        bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
+    }
+    return bytes;
+}
 
   disconnect(): void {
     if (this.device && this.device.gatt?.connected) {
