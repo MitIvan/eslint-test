@@ -1,68 +1,63 @@
 import { Injectable } from '@angular/core';
 
+// Declare navigator to access Bluetooth API
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const navigator: any;
-
 
 @Injectable({
   providedIn: 'root',
 })
 export class BluetoothService {
-  private device: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private device: any;
 
+  // Method to connect to a Bluetooth device
   async connect(): Promise<string | undefined | void> {
     try {
-      // Request a Bluetooth device
+      // Request a Bluetooth device with specific service
       this.device = await navigator.bluetooth.requestDevice({
         filters: [
           { 
             services : ['77370001-9156-09be-554f-63b16824d02b']
           }
         ]
-        // optionalServices: ['77370001-9156-09be-554f-63b16824d02b'], // Add the required service UUIDs here
       });
 
-      // if (!this.device.gatt) {
-      //   throw new Error('GATT server is not available on the device.');
-      // }
+      // Check if GATT server is available
+      if (!this.device.gatt) {
+        throw new Error('GATT server is not available on the device.');
+      }
 
+      // Connect to the GATT server
       const server = await this.device.gatt.connect();
       const service = await server.getPrimaryService('77370001-9156-09be-554f-63b16824d02b');
       const characteristic = await service.getCharacteristic('77370003-9156-09be-554f-63b16824d02b');
-      // const value = await characteristic.readValue();
-      // const data = value.getUint8(0);
 
+      // Start notifications for the characteristic
       await characteristic.startNotifications();
 
+      // Add event listener for characteristic value changes
       if (characteristic.properties.notify) {
         characteristic.addEventListener(
           "characteristicvaluechanged",
           (event: Event) => {
-            const target = event.target as any
-            const value = target.value
-            this.handleNotification(value)
+            const target = event.target as any;
+            const value = target.value;
+            this.handleNotification(value);
           },
         );
-       
       }
 
       return `Battery Level: %`;
     } catch (error) {
       console.log(error);
-      ;
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  handleNotification(value: any){
-  const hex = Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  console.log('Received hex value:', hex);
-  
-    console.log(value);
-    
-  }
-
+  // Method to write data to the Bluetooth device
   async writeData(): Promise<string | undefined | void> {
     try {
+      // Check if device is connected
       if (!this.device || !this.device.gatt.connected) {
         throw new Error('No connected device. Please connect to a device first.');
       }
@@ -72,7 +67,7 @@ export class BluetoothService {
       const service = await server.getPrimaryService('77370001-9156-09be-554f-63b16824d02b');
       const characteristic = await service.getCharacteristic('77370002-9156-09be-554f-63b16824d02b');
 
-      // Write the data (e.g., alert level: 0x00, 0x01, or 0x02)
+      // Convert hex string to Uint8Array and write to characteristic
       const dataToSend = this.hexStringToUint8Array('0x100210000134120d0000000d0000007856321003');
       await characteristic.writeValue(dataToSend);
 
@@ -82,14 +77,7 @@ export class BluetoothService {
     }
   }
 
-   hexStringToUint8Array(hexString:string) {
-    let bytes = new Uint8Array(hexString.length / 2);
-    for (let i = 0; i < hexString.length; i += 2) {
-        bytes[i / 2] = parseInt(hexString.substr(i, 2), 16);
-    }
-    return bytes;
-}
-
+  // Method to disconnect from the Bluetooth device
   disconnect(): void {
     if (this.device && this.device.gatt?.connected) {
       this.device.gatt.disconnect();
@@ -97,5 +85,27 @@ export class BluetoothService {
     } else {
       console.log('No device to disconnect');
     }
+  }
+
+  // Helper method to convert hex string to Uint8Array
+  private hexStringToUint8Array(hexString: string) {
+    // Remove '0x' prefix if present
+    const cleanHex = hexString.replace('0x', '');
+    const bytes = new Uint8Array(cleanHex.length / 2);
+    
+    for (let i = 0; i < cleanHex.length; i += 2) {
+      const byte = cleanHex.substr(i, 2).padStart(2, '0');
+      bytes[i / 2] = parseInt(byte, 16);
+    }
+    return bytes;
+  }
+
+  // Method to handle notifications from the Bluetooth device
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private handleNotification(value: any) {
+    const hex = Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    console.log('Received hex value:', hex);
+    console.log(value);
   }
 }
