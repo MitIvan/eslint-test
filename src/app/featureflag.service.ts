@@ -8,7 +8,7 @@ export class FeatureFlagService {
   private ldClient: LDClient.LDClient | null = null;
   private flagValues: Record<string, boolean> = {};
 
-  private _flagChange = signal<object>(null);
+  private _flagChange = signal<Record<string, boolean>>(null);
 
   _LDReady = signal<boolean>(false);
 
@@ -32,11 +32,27 @@ export class FeatureFlagService {
    
 
 
-    this.ldClient.on('change', (flags) => {
-      console.log('change', flags);
+    this.ldClient.on('change', (flags) => {      
+
+
+      this.flagValues = Object.keys(this.flagValues).reduce((acc, key) => {
+        if (key in flags) {
+          acc[key] = flags[key].current;
+        } else {
+          acc[key] = this.flagValues[key];
+        }
+        return acc;
+      }, {} as Record<string, boolean>);
+
+
+      console.log(this.flagValues);
       
-      this.flagValues = flags || {};
-      this._flagChange.set(this.flagValues);
+      console.log('change', flags);
+      const newFlags = this.flagValues 
+      console.log(newFlags);
+      
+      // this.flagValues = flags || {};
+      this._flagChange.set(newFlags);
     });
 
 
