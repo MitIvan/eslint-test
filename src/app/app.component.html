@@ -1,5 +1,18 @@
-<app-usb></app-usb>
-<hr />
-<app-serial-port></app-serial-port>
-<hr />
+@if (LdReady()) {
+
+
+@if (isUsbEnabled()) {
+    <ng-container>
+        <app-usb></app-usb>
+    </ng-container>
+    <hr />
+}
+
+@if (isSerialEnabled()) {
+    <ng-container>
+        <app-serial-port></app-serial-port>
+    </ng-container>
+    <hr />
+}
 <app-bluetooth></app-bluetooth>
+}
